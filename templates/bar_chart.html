@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="text-center mb-4">Earthquake Magnitude Distribution</h2>
+
+<!-- Chart Container -->
+<div id="my_dataviz"></div>
+
+<!-- D3.js -->
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script>
+  var data = {{ chart_data | tojson }};
+
+  var margin = {top: 20, right: 40, bottom: 40, left: 100},
+      //width = 600 - margin.left - margin.right,
+      //height = 400 - margin.top - margin.bottom;
+      width = window.innerWidth * 0.55,
+      height = data.length * 100;
+
+  var svg = d3.select("#my_dataviz")
+    .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+  var x = d3.scaleLinear()
+    .domain([0, d3.max(data, function(d) { return d.count; })])
+    .range([ 0, width]);
+
+  svg.append("g")
+    .attr("transform", "translate(0," + height + ")")
+    .call(d3.axisBottom(x))
+    .selectAll("text") // selects all tick labels
+    .style("font-size","14px") //text size 
+    .style("font-weight", "bold");
+
+  var y = d3.scaleBand()
+    .range([ 0, height ])
+    .domain(data.map(function(d) { return d.range; }))
+    .padding(.1);
+
+  svg.append("g")
+    .call(d3.axisLeft(y))
+    .selectAll("text") // selects all tick labels
+    .style("font-size","14px") //text size 
+    .style("font-weight", "bold");
+
+  svg.selectAll("myRect")
+    .data(data)
+    .enter()
+    .append("rect")
+      .attr("x", x(0) )
+      .attr("y", function(d) { return y(d.range); })
+      .attr("width", function(d) { return x(d.count); })
+      .attr("height", y.bandwidth() )
+      .attr("fill", "blue");
+
+
+svg.selectAll("label")
+  .data(data)
+  .enter()
+  .append("text")
+    .attr("x", function(d) { return x(d.count) + 5; })  // 5px to the right of the bar
+    .attr("y", function(d) { return y(d.range) + y.bandwidth() / 2 + 4; })  // vertically centered
+    .text(function(d) { return d.count; })
+    .attr("font-size", "14px")
+    .attr("fill", "black")
+    .style("font-weight", "bold");
+
+
+</script>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Back to Home</a>
+</div>
+{% endblock %}

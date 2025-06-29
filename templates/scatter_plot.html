@@ -1,0 +1,177 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="text-center mb-4">Earthquake Locations (Scatter Plot)</h2>
+
+<div id="scatter" class="d-flex justify-content-center"></div>
+
+<!-- Tooltip styles -->
+<style>
+  .tooltip {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    pointer-events: none;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+  }
+</style>
+<div id="tooltip" class="tooltip"></div>
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script>
+var data = {{ scatter_data | tojson | safe }};
+console.log("Data sample:", data[0]);
+
+// Chart setup
+var margin = {top: 30, right: 160, bottom: 50, left: 60},
+    width = 900 - margin.left - margin.right,
+    height = 600 - margin.top - margin.bottom;
+
+var svg = d3.select("#scatter")
+    .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+// Magnitude bins (still useful for the legend, even if color is continuous)
+var magBins = [
+    { range: "0–1", min: 0, max: 1 },
+    { range: "1–2", min: 1, max: 2 },
+    { range: "2–3", min: 2, max: 3 },
+    { range: "3–4", min: 3, max: 4 },
+    { range: "4–5", min: 4, max: 5 },
+    { range: "5–6", min: 5, max: 6 },
+    { range: "6–7", min: 6, max: 7 },
+    { range: "7–8", min: 7, max: 8 },
+    { range: "8–9", min: 8, max: 9 },
+    { range: "9–10", min: 9, max: 10 }
+];
+
+// Define a custom interpolator from blue to red
+var blueToRed = d3.interpolateLab("blue", "red"); // Uses L*a*b* color space for better perceptual uniformity
+
+// Magnitude color scale (continuous)
+var colorScale = d3.scaleSequential(blueToRed)
+    .domain([0, 10]); // Magnitudes will be mapped from 0 (blue) to 10 (red)
+
+// Map mag to range label (used for legend)
+function getMagnitudeRange(mag) {
+    for (let bin of magBins) {
+        if (mag >= bin.min && mag < bin.max) {
+            return bin.range;
+        }
+    }
+    return "Other";
+}
+
+// Scales
+var x = d3.scaleLinear()
+    .domain(d3.extent(data, d => d.long))
+    .range([0, width]);
+
+var y = d3.scaleLinear()
+    .domain(d3.extent(data, d => d.lat))
+    .range([height, 0]);
+
+// X-axis
+svg.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x))
+    .append("text")
+      .attr("x", width / 2)
+      .attr("y", 40)
+      .style("fill", "black")
+      .style("font-size", "14px")
+      .style("font-weight", "bold")
+      .text("Longitude");
+
+// Y-axis
+svg.append("g")
+    .call(d3.axisLeft(y))
+    .append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -45)
+      .style("fill", "black")
+      .style("font-size", "14px")
+      .style("font-weight", "bold")
+      .text("Latitude");
+
+// Tooltip setup
+var tooltip = d3.select("#tooltip");
+
+// Modified handleMouseOver to accept the actual data object
+function handleMouseOver(dataPoint) {
+    console.log("Full dataPoint:", dataPoint);
+    console.log("Hovered point long:", dataPoint.long);
+    console.log("Hovered point lat:", dataPoint.lat);
+    tooltip
+      .style("opacity", 1)
+      .html(
+        `Longitude: ${dataPoint.long?.toFixed(4)}<br>` +
+        `Latitude: ${dataPoint.lat?.toFixed(4)}<br>` +
+        `Magnitude: ${dataPoint.mag}`
+      );
+}
+
+function handleMouseMove(event) { // event is always the first arg for D3 v5
+    tooltip
+      .style("left", (event.pageX + 10) + "px")
+      .style("top", (event.pageY - 28) + "px");
+}
+
+function handleMouseOut() {
+    tooltip.style("opacity", 0);
+}
+
+// Plot points
+svg.selectAll("circle")
+    .data(data)
+    .enter()
+    .append("circle")
+      .attr("cx", d => x(d.long))
+      .attr("cy", d => y(d.lat))
+      .attr("r", 3)
+      .attr("fill", d => colorScale(d.mag))
+      .attr("opacity", 0.7)
+      .on("mouseover", function(event, d) { // event is the data
+          handleMouseOver(event); // Pass the data 'd' directly
+      })
+      .on("mousemove", handleMouseMove) // handleMouseMove only needs the event
+      .on("mouseout", handleMouseOut);
+
+// Legend - Now the legend will show representative colors for each bin
+var legend = svg.append("g")
+    .attr("transform", `translate(${width + 20}, 20)`);
+
+legend.selectAll(".legend-item")
+    .data(magBins)
+    .enter()
+    .append("g")
+      .attr("class", "legend-item")
+      .attr("transform", (d, i) => `translate(0, ${i * 20})`)
+    .each(function(d) {
+        d3.select(this)
+          .append("rect")
+            .attr("width", 14)
+            .attr("height", 14)
+            .attr("fill", colorScale((d.min + d.max) / 2)); // Use midpoint of bin for legend color
+
+        d3.select(this)
+          .append("text")
+            .attr("x", 20)
+            .attr("y", 12)
+            .text(d.range)
+            .style("font-size", "12px");
+    });
+</script>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('index') }}" class="btn btn-outline-primary">Back to Home</a>
+</div>
+{% endblock %}

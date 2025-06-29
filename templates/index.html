@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="text-center">
+    <a href="{{ url_for('insert') }}" class="btn btn-primary btn-lg mb-3">Insert New Earthquake</a><br>
+    <a href="{{ url_for('query') }}" class="btn btn-success btn-lg mb-3">Query 1:Query Earthquakes based on Mlow and Mhigh</a><br>
+    <a href="{{ url_for('bar_chart') }}" class="btn btn-info btn-lg mt-3">Query 2: Bar Chart of Earthquake Magnitudes</a><br>
+    <a href="{{ url_for('pie_chart') }}" class="btn btn-danger btn-lg mt-3">Query 3: Pie Chart of Earthquake Magnitudes</a><br>
+    <a href="{{ url_for('scatter_plot') }}" class="btn btn-info btn-lg mt-3">Query 4: Scatter Plot of Earthquake Locations</a><br>
+
+    <a href="{{ url_for('upload') }}" class="btn btn-warning btn-lg">Upload CSV</a>
+</div>
+{% endblock %}
