@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="text-center">Food Pie Chart by Amount Range</h2>
+
+<form method="POST" class="text-center">
+  <label for="min_amt">Min Amount:</label>
+  <input type="number" name="min_amt" required>
+  <label for="max_amt">Max Amount:</label>
+  <input type="number" name="max_amt" required>
+  <button type="submit" class="btn btn-primary ml-2">Generate Pie Chart</button>
+</form>
+{% endblock %}

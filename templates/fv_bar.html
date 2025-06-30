@@ -1,0 +1,77 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="text-center mb-4">Food Distribution (Horizontal Bar Chart)</h2>
+
+<div id="bar_chart" style="width: 90%; margin: auto;"></div>
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script>
+const data = {{ chart_data | tojson | safe }};
+
+// Dimensions and margins
+const margin = {top: 20, right: 100, bottom: 50, left: 100},
+      width = Math.min(window.innerWidth * 0.9, 1000),
+      height = data.length * 80;
+
+// SVG container
+const svg = d3.select("#bar_chart")
+  .append("svg")
+    .attr("width", width)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+// Scales
+const x = d3.scaleLinear()
+  .domain([0, d3.max(data, d => d.Amount)])
+  .range([0, width - margin.left - margin.right]);
+
+const y = d3.scaleBand()
+  .domain(data.map(d => d.Food))
+  .range([0, height])
+  .padding(0.2);
+
+// Draw bars
+svg.selectAll("rect")
+  .data(data)
+  .enter()
+  .append("rect")
+    .attr("y", d => y(d.Food))
+    .attr("width", d => x(d.Amount))
+    .attr("height", y.bandwidth())
+    .attr("fill", "steelblue");
+
+// Add food labels next to bars
+svg.selectAll("text.label")
+  .data(data)
+  .enter()
+  .append("text")
+    .attr("class", "label")
+    .attr("x", d => x(d.Amount) + 5)
+    .attr("y", d => y(d.Food) + y.bandwidth() / 2)
+    .attr("dy", "0.35em")
+    .text(d => `${d.Food} (${d.Amount})`)
+    .style("font-size", "13px");
+
+// Add X axis
+svg.append("g")
+  .attr("transform", `translate(0, ${height})`)
+  .call(d3.axisBottom(x).ticks(5))
+  .call(g => g.selectAll(".tick text").style("font-size", "12px"));
+
+// Add axis label
+svg.append("text")
+  .attr("x", (width - margin.left - margin.right) / 2)
+  .attr("y", height + margin.bottom - 5)
+  .attr("text-anchor", "middle")
+  .style("font-size", "14px")
+  .style("font-weight", "bold")
+  .text("Amount");
+
+</script>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('query_bar') }}" class="btn btn-outline-primary">New Range</a>
+  <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Back to Home</a>
+</div>
+{% endblock %}

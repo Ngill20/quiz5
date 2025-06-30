@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+{% block content %}
+<h2 class="text-center mb-4">Custom Scatter Plot</h2>
+
+<div id="scatter_chart" style="width: 90%; margin: auto;"></div>
+
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script>
+const data = {{ points | tojson | safe }};
+
+// Dimensions
+const margin = {top: 20, right: 20, bottom: 40, left: 40};
+const width = 600 - margin.left - margin.right;
+const height = 600 - margin.top - margin.bottom;
+
+// Scales
+const x = d3.scaleLinear().domain([0, 50]).range([0, width]);
+const y = d3.scaleLinear().domain([0, 50]).range([height, 0]);
+
+const colorMap = {
+  1: "green",
+  2: "black",
+  3: "red"
+};
+
+const svg = d3.select("#scatter_chart")
+  .append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+// Axes
+svg.append("g")
+  .attr("transform", `translate(0,${height})`)
+  .call(d3.axisBottom(x).ticks(10));
+
+svg.append("g")
+  .call(d3.axisLeft(y).ticks(10));
+
+// Labels
+svg.append("text")
+  .attr("x", width / 2)
+  .attr("y", height + margin.bottom - 5)
+  .attr("text-anchor", "middle")
+  .text("X Axis");
+
+svg.append("text")
+  .attr("transform", "rotate(-90)")
+  .attr("x", -height / 2)
+  .attr("y", -margin.left + 15)
+  .attr("text-anchor", "middle")
+  .text("Y Axis");
+
+// Points
+svg.selectAll("circle")
+  .data(data)
+  .enter()
+  .append("circle")
+    .attr("cx", d => x(d.x))
+    .attr("cy", d => y(d.y))
+    .attr("r", 6)
+    .attr("fill", d => colorMap[d.c] || "gray");
+</script>
+
+<div class="text-center mt-4">
+  <a href="{{ url_for('query_scatter') }}" class="btn btn-outline-primary">Enter New Points</a>
+  <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">Back to Home</a>
+</div>
+{% endblock %}

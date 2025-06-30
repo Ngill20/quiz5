@@ -31,66 +31,62 @@ def get_connection():
         f'Connection Timeout=30;'
     )
 
+fvdata = pd.DataFrame([
+    [10, "Apples", "F"],
+    [2, "Bananas", "F"],
+    [40, "Cherries", "F"],
+    [1, "Daikon", "V"],
+    [10, "Fig", "F"],
+    [30, "Grapes", "F"],
+    [5, "Peach", "F"],
+    [12, "Celery", "V"],
+    [1, "Watermelon", "F"]
+], columns=["Amount", "Food", "Category"])
+fvdata["Amount"] = fvdata["Amount"].astype(int)
+
 @app.route('/')
 def index():
     print("Rendering index.html")  # Make sure this prints in your terminal
     return render_template('index.html')
     #return "<h1>Test page</h1>"
 
-@app.route('/insert', methods=['GET', 'POST'])
-def insert():
-    if request.method == 'POST':
-        # Extract values from form (for simplified CSV structure)
-        quake_id = request.form.get('id')
-        time = safe_int(request.form.get('time'))  # Assuming time is an integer like in the CSV
-        latitude = safe_float(request.form.get('lat'))
-        longitude = safe_float(request.form.get('long'))
-        mag = safe_float(request.form.get('mag'))
-        nst = safe_int(request.form.get('nst'))
-        net = request.form.get('net')
-
-        # Insert into Earthquakes table
-        conn = get_connection()
-        cursor = conn.cursor()
-        try:
-            cursor.execute("""
-                INSERT INTO Earthquakes (
-                    id, time, latitude, longitude, mag, nst, net
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, quake_id, time, latitude, longitude, mag, nst, net)
-            conn.commit()
-            flash('Earthquake record inserted successfully!')
-        except Exception as e:
-            flash(f'Insert failed: {e}')
-        finally:
-            cursor.close()
-            conn.close()
-
-        return redirect(url_for('index'))
-
-    return render_template('insert.html')
-
 
 @app.route('/query', methods=['GET', 'POST'])
 def query():
     if request.method == 'POST':
-        min_mag = request.form.get('Mlow', 0)
-        max_mag = request.form.get('Mhigh', 10)
-        conn = get_connection()
-        query = """
-            SELECT id, time, latitude, longitude, mag, nst, net
-            FROM Earthquakes
-            WHERE mag BETWEEN ? AND ?
-            ORDER BY time DESC
-        """
-        df = pd.read_sql(query, conn, params=[min_mag, max_mag])
-        conn.close()
+        try:
+            min_amt = safe_int(request.form.get('min_amt'))
+            max_amt = safe_int(request.form.get('max_amt'))
+            if min_amt is None or max_amt is None:
+                flash("Please provide valid amount values.")
+                return redirect(url_for('query'))
 
-        # Remove leading/trailing \n and whitespace in the HTML
-        html_table = df.to_html(classes='table table-striped', index=False).replace('\n', '')
+            total = 0
+            # Filter fvdata
+            filtered = []
+            for _, row in fvdata.iterrows():
+                if int(row["Amount"]) > min_amt and int(row["Amount"]) < max_amt:
+                    total = total + row["Amount"]
+                    filtered.append(row)
 
-        return render_template('results.html', tables=[html_table], titles=df.columns.values)
-    return render_template('query.html')
+            chart_data = [
+                {
+                    "food": row["Food"],
+                    "amount": row["Amount"],
+                    "percent": round((row["Amount"] / total) * 100, 1)
+                }
+                for row in filtered
+            ]
+            
+            print(chart_data)
+            return render_template("fv_pie.html", chart_data=chart_data)
+
+        except Exception as e:
+            flash(f"Error: {e}")
+            return redirect(url_for('query'))
+
+    return render_template('query_form.html')  # create form with min_amt and max_amt fields
+
 
 @app.route('/bar_chart')
 def bar_chart():
@@ -138,52 +134,6 @@ def bar_chart():
     chart_data = [{"range": row[0], "count": row[1]} for row in results if row[0] != 'Other']
     return render_template("bar_chart.html", chart_data=chart_data)
 
-@app.route('/pie_chart')
-def pie_chart():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    query = """
-        SELECT 
-            CASE 
-                WHEN mag >= 0 AND mag < 1 THEN '0-1'
-                WHEN mag >= 1 AND mag < 2 THEN '1-2'
-                WHEN mag >= 2 AND mag < 3 THEN '2-3'
-                WHEN mag >= 3 AND mag < 4 THEN '3-4'
-                WHEN mag >= 4 AND mag < 5 THEN '4-5'
-                WHEN mag >= 5 AND mag < 6 THEN '5-6'
-                WHEN mag >= 6 AND mag < 7 THEN '6-7'
-                WHEN mag >= 7 AND mag < 8 THEN '7-8'
-                WHEN mag >= 8 AND mag < 9 THEN '8-9'
-                WHEN mag >= 9 AND mag <= 10 THEN '9-10'
-                ELSE 'Other'
-            END AS magnitude_range,
-            COUNT(*) AS count
-        FROM Earthquakes
-        GROUP BY 
-            CASE 
-                WHEN mag >= 0 AND mag < 1 THEN '0-1'
-                WHEN mag >= 1 AND mag < 2 THEN '1-2'
-                WHEN mag >= 2 AND mag < 3 THEN '2-3'
-                WHEN mag >= 3 AND mag < 4 THEN '3-4'
-                WHEN mag >= 4 AND mag < 5 THEN '4-5'
-                WHEN mag >= 5 AND mag < 6 THEN '5-6'
-                WHEN mag >= 6 AND mag < 7 THEN '6-7'
-                WHEN mag >= 7 AND mag < 8 THEN '7-8'
-                WHEN mag >= 8 AND mag < 9 THEN '8-9'
-                WHEN mag >= 9 AND mag <= 10 THEN '9-10'
-                ELSE 'Other'
-            END
-        ORDER BY magnitude_range
-    """
-    cursor.execute(query)
-    results = cursor.fetchall()
-    cursor.close()
-    conn.close()
-
-    chart_data = [{"range": row[0], "count": row[1]} for row in results if row[0] != 'Other']
-    return render_template("pie_chart.html", chart_data=chart_data)
-
 
 
 @app.route('/scatter_plot')
@@ -207,55 +157,50 @@ def scatter_plot():
 
 
 
-
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
+@app.route('/query_bar', methods=['GET', 'POST'])
+def query_bar():
     if request.method == 'POST':
-        file = request.files['file']
-        if file and file.filename.endswith('.csv'):
-            file_path = os.path.join('static', 'uploads', file.filename)
-            file.save(file_path)
+        try:
+            min_amt = safe_int(request.form.get('min_amt'))
+            max_amt = safe_int(request.form.get('max_amt'))
 
-            # Read CSV with expected columns
-            df_cleaned = pd.read_csv(file_path, skip_blank_lines=True)
+            if min_amt is None or max_amt is None:
+                flash("Please provide valid amount values.")
+                return redirect(url_for('query_bar'))
 
-            conn = get_connection()
-            cursor = conn.cursor()
-            for index, row in df_cleaned.iterrows():
-                try:
-                    raw_time = safe_float(row['time'])  # allow decimal minutes/seconds
-                    if raw_time is not None:
-                        time_new = datetime(1970, 1, 1) + timedelta(minutes=raw_time)  # or timedelta(seconds=raw_time)
-                    else:
-                        time_new = None
-                    time      = safe_int(row['time'])
-                    latitude  = safe_float(row['lat'])
-                    longitude = safe_float(row['long'])
-                    mag       = safe_float(row['mag'])
-                    nst       = safe_int(row['nst'])
-                    net       = str(row['net']) if pd.notna(row['net']) else None
-                    id_       = str(row['id'])
-                    
-                    print(f"Row {index}: time={time}, lat={latitude}, mag={mag}, id={id_}")
-                    cursor.execute("""
-                        INSERT INTO Earthquakes (
-                            time, latitude, longitude, mag, nst, net, id
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """, time, latitude, longitude, mag, nst, net, id_)
+            # Filter and sort (smallest to largest)
+            filtered_df = fvdata[(fvdata["Amount"] >= min_amt) & (fvdata["Amount"] <= max_amt)]
+            filtered_df = filtered_df.sort_values("Amount", ascending=True)
 
-                except Exception as e:
-                    print(f"Failed to insert row {index}: {e}")
-                    print(df_cleaned.iloc[index])
+            chart_data = filtered_df.to_dict(orient='records')
+            return render_template("fv_bar.html", chart_data=chart_data)
 
-            conn.commit()
-            cursor.close()
-            conn.close()
-            flash('CSV data uploaded successfully!')
-            return redirect(url_for('index'))
-        else:
-            flash('Please upload a valid CSV file.')
-            return redirect(url_for('upload'))
-    return render_template('upload.html')
+        except Exception as e:
+            flash(f"Error: {e}")
+            return redirect(url_for('query_bar'))
+
+    return render_template('query_form_bar.html')
+
+
+@app.route('/query_scatter', methods=['GET', 'POST'])
+def query_scatter():
+    if request.method == 'POST':
+        points = []
+        for i in range(10):
+            x = safe_int(request.form.get(f'x{i}'))
+            y = safe_int(request.form.get(f'y{i}'))
+            c = safe_int(request.form.get(f'c{i}'))
+            if x is not None and y is not None and c in [1, 2, 3]:
+                points.append({'x': x, 'y': y, 'c': c})
+
+        if not points:
+            flash("Please enter at least one valid point with x, y between 0–50 and c = 1, 2, or 3.")
+            return redirect(url_for('query_scatter'))
+
+        return render_template('scatter_user_plot.html', points=points)
+
+    return render_template('query_scatter_form.html')
+
 
 
 def safe_float(val):
